@@ -85,6 +85,7 @@ defmodule ExCoveralls.Local do
       #{Enum.join(format_body(count_info), "\n")}
       #{format_total(count_info)}
       ----------------\
+      #{format_uncovered(count_info)}\
       """
     else
       "Test Coverage #{format_total(count_info)}\n"
@@ -152,6 +153,54 @@ defmodule ExCoveralls.Local do
     totals   = Enum.reduce(info, %Count{}, fn([_, count], acc) -> append(count, acc) end)
     coverage = get_coverage(totals)
     print_string("[TOTAL] ~5.1f%", [coverage])
+  end
+
+  defp format_uncovered(info) do
+    coverage_options = ExCoveralls.Settings.get_coverage_options
+    report_uncovered = coverage_options["report_uncovered"]
+
+    if report_uncovered do
+      info
+      |> filter_uncovered()
+      |> format_uncovered_body()
+      |> case do
+        [] -> ""
+        list ->
+          "\n#{IO.ANSI.yellow}UNCOVERED FILES\n#{Enum.join(list, "\n")}#{IO.ANSI.reset}\n"
+      end
+    end
+  end
+
+  defp format_uncovered_body(info) do
+    Enum.map(info, &format_uncovered_info/1)
+  end
+
+  defp format_uncovered_info([stat, count]) do
+    coverage = get_coverage(count)
+    file_width = ExCoveralls.Settings.get_file_col_width
+    uncovered_line_numbers = format_uncovered_line_numbers(stat)
+
+    print_string("~5.1f% ~-#{file_width}s ~s",
+      [coverage, stat[:name], uncovered_line_numbers])
+  end
+
+  defp format_uncovered_line_numbers(%{source: source, coverage: coverage}) do
+    lines = source |> String.split("\n") |> Enum.with_index(1)
+
+    Enum.zip(lines, coverage)
+    |> Enum.filter(&filter_uncovered_lines/1)
+    |> Enum.map(&format_uncovered_line/1)
+    |> Enum.join(", ")
+  end
+
+  defp filter_uncovered_lines({_line, coverage}), do: coverage == 0
+
+  defp format_uncovered_line({{_line, index}, _coverage}), do: "L#{index}"
+
+  defp filter_uncovered(info) do
+    Enum.filter(info, fn [_stat, count] ->
+      get_coverage(count) < 100
+    end)
   end
 
   defp append(a, b) do

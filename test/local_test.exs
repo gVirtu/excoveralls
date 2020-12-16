@@ -30,6 +30,15 @@ defmodule ExCoveralls.LocalTest do
       "[TOTAL]  50.0%\n" <>
       "----------------\n"
 
+  @stats_result_with_uncovered_report "" <>
+      "----------------\n" <>
+      "COV    FILE                                        LINES RELEVANT   MISSED\n" <>
+      " 50.0% test/fixtures/test.ex                           4        2        1\n"  <>
+      "[TOTAL]  50.0%\n" <>
+      "----------------\n" <>
+      "#{IO.ANSI.yellow}UNCOVERED FILES\n" <>
+      " 50.0% test/fixtures/test.ex                    L1#{IO.ANSI.reset}\n"
+
   @stats_no_files_results "Test Coverage [TOTAL]  50.0%\n"
 
   @source_result "" <>
@@ -60,6 +69,18 @@ defmodule ExCoveralls.LocalTest do
     assert capture_io(fn ->
       Local.execute(@source_info, [detail: true])
     end) =~ @stats_result <> @source_result <> "\n"
+  end
+
+  test_with_mock "display stats information with uncovered report",
+    ExCoveralls.Settings, [
+      get_coverage_options: fn -> %{"report_uncovered" => true} end,
+      get_print_summary: fn -> true end,
+      get_print_files: fn -> true end,
+      get_file_col_width: fn -> 40 end
+    ] do
+    assert capture_io(fn ->
+      Local.execute(@source_info)
+    end) =~ @stats_result_with_uncovered_report
   end
 
   test "display stats information fails with invalid data" do
