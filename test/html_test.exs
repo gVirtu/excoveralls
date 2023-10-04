@@ -5,7 +5,7 @@ defmodule ExCoveralls.HtmlTest do
   alias ExCoveralls.Html
 
   @file_name "excoveralls.html"
-  @file_size 20191
+  @file_size 20375
   @test_output_dir "cover_test/"
   @test_template_path "lib/templates/html/htmlcov/"
 
@@ -24,6 +24,7 @@ defmodule ExCoveralls.HtmlTest do
     "----------------\n"
 
   setup do
+    ExCoveralls.ConfServer.clear()
     path = Path.expand(@file_name, @test_output_dir)
 
     # Assert does not exist prior to write
@@ -34,6 +35,8 @@ defmodule ExCoveralls.HtmlTest do
         File.rm!(path)
         File.rmdir!(@test_output_dir)
       end
+      
+      ExCoveralls.ConfServer.clear()
     end
 
     {:ok, report: path}

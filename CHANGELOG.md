@@ -1,3 +1,100 @@
+0.17.1
+------
+#### Enhancements
+- Accept custom http options (#319).
+
+0.17.0
+------
+#### Changes
+- Replace hackney with httpc (#311).
+- Update Elixir requirement to 1.11+ (#316).
+- Fix lcov 2.0 source file handling (#315).
+- Import .coverdata after test run and improve documentation (#309).
+  - Fixes around `--import-cover` option.
+
+0.16.1
+------
+#### Changes
+- Cobertura now handles defprotocol and defimpl definitions (#306).
+
+0.16.0
+------
+#### Enhancements
+- Add coveralls.multiple command (#303).
+- Support `# coveralls-ignore-next-line` comment for ignoring single next line.
+  - Ignore single next line (#301).
+- Add `mix coveralls.cobertura` task.
+  - cobertura task (#302).
+
+0.15.3
+------
+#### Enhancements
+- Support `--import_cover` option.
+  - Import coverdata if needed (#292).
+
+0.15.2
+------
+#### Changes
+- Add .coverdata file export (#298).
+  - Allow default use of `mix test --cover --export-coverage XXX`.
+
+0.15.1
+------
+#### Changes
+- Improve logging for a case with the missing source file (#295).
+
+0.15.0
+------
+#### Enhancements
+- Allows flag_name to pass thru to the coveralls.io API (#290).
+
+#### Changes
+- Allow subdir and rootdir to be applied to all tasks and always apply to paths (#289).
+
+0.14.6
+------
+#### Changes
+- Survive coveralls maintenance and outage (#283).
+  - Better handling of coveralls.io errors (ex. 405, 500 status codes).
+
+0.14.5
+------
+#### Enhancements
+- Add option (`html_filter_full_covered`) for filtering out full covered files from HTML report (#268).
+
+0.14.4
+------
+#### Changes
+- Fix for application base path identification logic.
+    - Use `File.cwd!/0` for fetching base path tests (#271).
+- Support Elixir 1.13 (#267).
+
+0.14.3
+------
+#### Enhancements
+- Add :base_path config option to specify application root path (#269).
+
+0.14.2
+------
+#### Enhancements
+- Minimum support for lcov - experimental (#261, #264).
+
+0.14.1
+------
+#### Changes
+- Fix HTML tag typo (#259).
+
+0.14.0
+------
+#### Enhancements
+- Add `mix coveralls.post` task (#244).
+
+0.13.4
+------
+#### Enhancements
+- Add `mix coveralls.gitlab` task.
+   - Add a task to upload coverage from gitlab (#240).
+
 0.13.3
 ------
 #### Changes

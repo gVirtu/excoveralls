@@ -5,9 +5,11 @@ ExCoveralls
 [![Coverage Status](https://coveralls.io/repos/parroty/excoveralls/badge.svg?branch=master)](https://coveralls.io/r/parroty/excoveralls?branch=master)
 [![hex.pm version](https://img.shields.io/hexpm/v/excoveralls.svg)](https://hex.pm/packages/excoveralls)
 [![hex.pm downloads](https://img.shields.io/hexpm/dt/excoveralls.svg)](https://hex.pm/packages/excoveralls)
+[![hex.pm license](https://img.shields.io/hexpm/l/excoveralls.svg)](https://github.com/parroty/excoveralls/blob/master/LICENSE)
+[![Last Updated](https://img.shields.io/github/last-commit/parroty/excoveralls.svg)](https://github.com/parroty/excoveralls/commits/master)
 
 An Elixir library that reports test coverage statistics, with the option to post to [coveralls.io](https://coveralls.io/) service.
-It uses Erlang's [cover](http://www.erlang.org/doc/man/cover.html) to generate coverage information, and posts the test coverage results to coveralls.io through the json API.
+It uses Erlang's [cover](http://www.erlang.org/doc/man/cover.html) to generate coverage information, and posts the test coverage results to coveralls.io through the JSON API.
 
 The following are example projects.
   - [coverage_sample](https://github.com/parroty/coverage_sample) is for Travis CI.
@@ -16,17 +18,21 @@ The following are example projects.
   - [semaphore_sample](https://github.com/parroty/semaphore_sample) is for Semaphore CI.
   - [excoveralls_umbrella](https://github.com/parroty/excoveralls_umbrella) is for umbrella project.
   - [gitlab_sample](https://gitlab.com/parroty/gitlab_sample) is for GitLab CI (using GitLab CI feature instead of coveralls.io).
+  - [gitlab_parallel_sample](https://gitlab.com/parroty/excoveralls-demo) is for GitLab CI (with parallel option).
   - [drone_sample](https://github.com/vorce/drone_sample) is for Drone CI.
+  - [excoveralls_post_sample](https://github.com/hirotnk/excoveralls_post_sample) is for coveralls.post usage example.
 
 # Settings
 ### mix.exs
 Add the following parameters.
 
 - `test_coverage: [tool: ExCoveralls]` for using ExCoveralls for coverage reporting.
+- `test_coverage: [tool: ExCoveralls, export: "cov"]` for exporting data to `cover/cov.coverdata`
 - `preferred_cli_env: [coveralls: :test]` for running `mix coveralls` in `:test` env by default
     - It's an optional setting for skipping `MIX_ENV=test` part when executing `mix coveralls` tasks.
 - `test_coverage: [test_task: "espec"]` if you use Espec instead of default ExUnit.
 - `:excoveralls` in the deps function.
+- `Application.put_env(:excoveralls, :base_path, "/bash/path")` an optional config if you want to set the application root path explicitly. By default this is the directory that the mix.exs file is in.
 
 ```elixir
 def project do
@@ -36,7 +42,12 @@ def project do
     elixir: "~> 1.0.0",
     deps: deps(),
     test_coverage: [tool: ExCoveralls],
-    preferred_cli_env: [coveralls: :test, "coveralls.detail": :test, "coveralls.post": :test, "coveralls.html": :test]
+    preferred_cli_env: [
+      coveralls: :test,
+      "coveralls.detail": :test,
+      "coveralls.post": :test,
+      "coveralls.html": :test
+    ]
     # if you want to use espec,
     # test_coverage: [tool: ExCoveralls, test_task: "espec"]
   ]
@@ -56,6 +67,7 @@ end
 
 # Usage
 ## Mix Tasks
+- [ExCoveralls](#excoveralls)
 - [Settings](#settings)
     - [mix.exs](#mixexs)
 - [Usage](#usage)
@@ -64,7 +76,7 @@ end
     - [[mix coveralls.travis] Post coverage from travis](#mix-coverallstravis-post-coverage-from-travis)
       - [.travis.yml](#travisyml)
     - [[mix coveralls.github] Post coverage from GitHub Actions](#mix-coverallsgithub-post-coverage-from-github-actions)
-      - [.github/workflows/main.yml](#githubworkflowsexampleyml)
+      - [.github/workflows/example.yml](#githubworkflowsexampleyml)
     - [[mix coveralls.circle] Post coverage from circle](#mix-coverallscircle-post-coverage-from-circle)
       - [circle.yml](#circleyml)
     - [[mix coveralls.semaphore] Post coverage from semaphore](#mix-coverallssemaphore-post-coverage-from-semaphore)
@@ -76,14 +88,20 @@ end
     - [[mix coveralls.html] Show coverage as HTML report](#mix-coverallshtml-show-coverage-as-html-report)
     - [[mix coveralls.json] Show coverage as JSON report](#mix-coverallsjson-show-coverage-as-json-report)
     - [[mix coveralls.xml] Show coverage as XML report](#mix-coverallsxml-show-coverage-as-xml-report)
+    - [[mix coveralls.cobertura] Show coverage as Cobertura report](#mix-coverallscobertura-show-coverage-as-cobertura-report)
+    - [[mix coveralls.lcov] Show coverage as lcov report (Experimental)](#mix-coverallslcov-show-coverage-as-lcov-report-experimental)
   - [coveralls.json](#coverallsjson)
-      - [Stop Words](#stop-words)
-      - [Exclude Files](#exclude-files)
-      - [Terminal Report Output](#terminal-report-output)
-      - [Coverage Options](#coverage-options)
-  - [Ignore Lines](#ignore-lines)
-  - [Notes](#notes)
-  - [Todo](#todo)
+    - [Stop Words](#stop-words)
+    - [Exclude Files](#exclude-files)
+    - [Terminal Report Output](#terminal-report-output)
+    - [Coverage Options](#coverage-options)
+  - [Other Considerations](#other-considerations)
+    - [Ignore Lines](#ignore-lines)
+    - [Silence OTP Cover Warnings](#silence-otp-cover-warnings)
+    - [Merging Coverage Results](#merging-coverage-results)
+    - [Notes](#notes)
+    - [Todo](#todo)
+- [License](#license)
 
 ### [mix coveralls] Show coverage
 Run the `MIX_ENV=test mix coveralls` command to show coverage information on localhost.
@@ -106,7 +124,7 @@ COV    FILE                                        LINES RELEVANT   MISSED
 ----------------
 ```
 
-Specifying the --help option displays the options list for available tasks.
+Specifying the `--help` option displays the options list for available tasks.
 
 ```Shell
 Usage: mix coveralls <Options>
@@ -120,6 +138,19 @@ Usage: mix coveralls <Options>
     -o (--output-dir)   Write coverage information to output dir.
     -u (--umbrella)     Show overall coverage for umbrella project.
     -v (--verbose)      Show json string for posting.
+    --subdir            Git repo sub directory: This will be added to the the front of file path, use if your covered
+                        file paths reside within a subfolder of the git repo. Example: If your source file path is
+                        "test.ex", and your git repo root is one directory up making the file's relative path
+                        "src/lib/test.ex", then the sub directory should be: "src/lib" (from coveralls.io)
+    --rootdir           This will be stripped from the file path in order to resolve the relative path of this repo's
+                        files. It should be the path to your git repo's root on your CI build environment. This is not
+                        needed if your source file path is already relative. It's used to pull the source file from the
+                        github repo, so must be exact. Example: If your source file path is "/home/runs/app/test.ex",
+                        and your git repo resides in "app", then the root path should be: "/home/runs/app/" (from
+                        coveralls.io)
+    --flagname          Job flag name which will be shown in the Coveralls UI
+    --import-cover      Directory from where '.coverdata' files should be imported and their results added to the report.
+                        Coverdata is imported after tests are run.
 
 Usage: mix coveralls.detail [--filter file-name-pattern]
   Used to display coverage with detail
@@ -143,6 +174,8 @@ Usage: mix coveralls.post <Options>
     -c (--committer)    Committer name ('COMMITTER' column at coveralls.io page)
     -m (--message)      Commit message ('COMMIT' column at coveralls.io page)
     -s (--sha)          Commit SHA (required when not using Travis)
+    --build             Service number ('BUILDS' column at coveralls.io page)
+    --parallel          coveralls.io 'parallel' option (See coveralls.io API Reference)
 ```
 
 ### [mix coveralls.travis] Post coverage from travis
@@ -171,7 +204,7 @@ repo token is available via the `COVERALLS_REPO_TOKEN` environment
 variable.
 
 ### [mix coveralls.github] Post coverage from [GitHub Actions](https://github.com/features/actions)
-Specify `mix coveralls.github` as the build script in the GitHub action YML file and explicitly set the `MIX_ENV` environment to `test` and add `GITHUB_TOKEN` with the value of `{{ secrets.GITHUB_TOKEN }}`, this is required because is used internaly by coveralls.io to check the action and add statuses.
+Specify `mix coveralls.github` as the build script in the GitHub action YML file and explicitly set the `MIX_ENV` environment to `test` and add `GITHUB_TOKEN` with the value of `{{ secrets.GITHUB_TOKEN }}`, this is required because is used internally by coveralls.io to check the action and add statuses.
 
 The value of `secrets.GITHUB_TOKEN` is added automatically inside every GitHub action, so you not need to assign that.
 
@@ -194,7 +227,7 @@ jobs:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v1.0.0
-      - uses: actions/setup-elixir@v1.0.0
+      - uses: erlef/setup-beam@v1
         with:
           otp-version: ${{matrix.otp}}
           elixir-version: ${{matrix.elixir}}
@@ -311,7 +344,7 @@ Output to the shell is the same as running the command `mix coveralls` (to suppr
 ```Shell
 $ MIX_ENV=test mix coveralls.html
 ```
-![HTML Report](./README/html_report.jpg?raw=true "HTML Report")
+![HTML Report](./assets/html_report.jpg?raw=true "HTML Report")
 
 Output reports are written to `cover/excoveralls.html` by default, however, the path can be specified by overwriting the `"output_dir"` coverage option.
 Custom reports can be created and utilized by defining `template_path` in `coveralls.json`. This directory should
@@ -333,6 +366,20 @@ The report follows a format supported by several code coverage services like Son
 Output to the shell is the same as running the command `mix coveralls` (to suppress this output, add `"print_summary": false` to your project's `coveralls.json` file). In a similar manner to `mix coveralls.detail`, reported source code can be filtered by specifying arguments using the `--filter` flag.
 
 Output reports are written to `cover/excoveralls.xml` by default, however, the path can be specified by overwriting the `"output_dir"` coverage option.
+
+### [mix coveralls.cobertura] Show coverage as Cobertura report
+This task displays coverage information at the source-code level formatted as a [Cobertura](https://cobertura.github.io/cobertura/) document.
+The report follows a format supported by [Gitlab](https://docs.gitlab.com/ee/ci/testing/test_coverage_visualization.html) code coverage visualization.
+Output to the shell is the same as running the command `mix coveralls` (to suppress this output, add `"print_summary": false` to your project's `coveralls.json` file). In a similar manner to `mix coveralls.detail`, reported source code can be filtered by specifying arguments using the `--filter` flag.
+
+Output reports are written to `cover/cobertura.xml` by default, however, the path can be specified by overwriting the `"output_dir"` coverage option.
+
+### [mix coveralls.lcov] Show coverage as lcov report (Experimental)
+This task displays coverage information at the line level formatted as a lcov.
+The report follows a format supported by several code coverage services like VSCode extension(`ryanluker.vscode-coverage-gutters`).
+Output to the shell is the same as running the command `mix coveralls` (to suppress this output, add `"print_summary": false` to your project's `coveralls.json` file). In a similar manner to `mix coveralls.detail`, reported source code can be filtered by specifying arguments using the `--filter` flag.
+
+Output reports are written to `cover/lcov.info` by default, however, the path can be specified by overwriting the `"output_dir"` coverage option.
 
 ## coveralls.json
 `coveralls.json` provides settings for excoveralls.
@@ -384,14 +431,18 @@ to `false`:
 ```
 
 #### Coverage Options
-- treat_no_relevant_lines_as_covered
+- `treat_no_relevant_lines_as_covered`
   - By default, coverage for [files with no relevant lines] are displayed as 0% for aligning with coveralls.io behavior. But, if `treat_no_relevant_lines_as_covered` is set to `true`, it will be displayed as 100%.
-- output_dir
+- `output_dir`
   - The directory which the HTML report will output to. Defaulted to `cover/`.
-- template_path
+- `template_path`
   - A custom path for html reports. This defaults to the htmlcov report in the excoveralls lib.
-- minimum_coverage
+- `minimum_coverage`
   - When set to a number greater than 0, this setting causes the `mix coveralls` and `mix coveralls.html` tasks to exit with a status code of 1 if test coverage falls below the specified threshold (defaults to 0). This is useful to interrupt CI pipelines with strict code coverage rules. Should be expressed as a number between 0 and 100 signifying the minimum percentage of lines covered.
+- `html_filter_full_covered`
+  - A boolean, when `true` files with 100% coverage are not shown in the HTML report. Default to `false`.
+
+Example configuration file:
 
 ```javascript
 {
@@ -410,10 +461,13 @@ to `false`:
     "output_dir": "cover/",
     "template_path": "custom/path/to/template/",
     "minimum_coverage": 90,
-    "xml_base_dir": "custom/path/for/xml/reports/"
+    "xml_base_dir": "custom/path/for/xml/reports/",
+    "html_filter_full_covered": true
   }
 }
 ```
+
+## Other Considerations
 
 ### Ignore Lines
 
@@ -423,13 +477,99 @@ Use comments `coveralls-ignore-start` and `coveralls-ignore-stop` to ignore cert
 defmodule MyModule do
   def covered do
   end
-  
+
   # coveralls-ignore-start
   def ignored do
   end
   # coveralls-ignore-stop
 end
 ```
+
+Use comment `coveralls-ignore-next-line` to ignore only the next line.
+
+```elixir
+defmodule MyModule do
+  def covered do
+    # coveralls-ignore-next-line
+    "ignored"
+    "covered"
+  end
+end
+```
+
+### Silence OTP Cover Warnings
+To remove OTP warnings about modules or specific logging, you can copy the `cover.erl` file under `src/` of your Elixir project and modify it to remove the warnings, as a tentative solution.
+
+- Remove the 2 lines below to remove the "WARNING: Module already imported from ..." log
+https://github.com/erlang/otp/blob/131398b54cca5f1ae95ed268274936d2efde8c39/lib/tools/src/cover.erl#L1553-L1554
+
+- If you do not want the imported info cluttering your test output, replace the function in https://github.com/erlang/otp/blob/131398b54cca5f1ae95ed268274936d2efde8c39/lib/tools/src/cover.erl#L1520-L1525 with
+```
+imported_info(_Text,_Module,_Imported) ->
+    ok.
+```
+
+### Merging Coverage Results
+
+ExCoveralls can include `.coverdata` files in the result of the current test run through the `--import-cover` flag. This can be used to include coverage data from partitioned tests or integration tests that may run in a subprocess, for instance.
+
+Coverage data is generated when running `mix test --cover`, optionally with the `--export-coverage` flag to specify an output name.
+
+```shell
+$ mix test --only integration --cover --export-coverage integration-coverage
+Excluding tags: [:test]
+Including tags: [:integration]
+... test run omitted ...
+# Coverage data written to cover/integration-coverage.coverdata
+
+# Report coverage, do not run integration tests
+$ mix coveralls --exclude integration
+Excluding tags: [:integration]
+... test run omitted ...
+
+----------------
+COV    FILE                                        LINES RELEVANT   MISSED
+...
+[TOTAL]  80.2% # <-- This result does not include coverage from integration tests
+----------------
+
+# Report coverage, do not run integration tests, but include previously written coverdata
+$ mix coveralls --exclude integration --import-cover cover
+Excluding tags: [:integration]
+... test run omitted ...
+
+----------------
+COV    FILE                                        LINES RELEVANT   MISSED
+...
+[TOTAL]  95.3% # <-- This result now includes coverage from integration tests
+----------------
+```
+
+Coverage data is imported after tests are run.
+
+See the `mix test` [Coverage documentation](https://hexdocs.pm/mix/Mix.Tasks.Test.html#module-coverage) for more information on `.coverdata`.
+
+### Configuring HTTP Options in ExCoveralls
+
+You can customize the HTTP options used by [`:httpc`](https://www.erlang.org/doc/man/httpc.html) when posting results. The example below shows how to specify a custom `cacertfile`:
+
+```elixir
+config :excoveralls,
+  http_options: [
+    timeout: 10_000,
+    ssl: [
+      # Refer to the secure coding guide:
+      # https://erlef.github.io/security-wg/secure_coding_and_deployment_hardening/inets
+      verify: :verify_peer,
+      depth: 2,
+      customize_hostname_check: [
+        match_fun: :public_key.pkix_verify_hostname_match_fun(:https)
+      ],
+      cacertfile: to_charlist(System.fetch_env!("TEST_COVERAGE_CACERTFILE"))
+    ]
+```
+
+By default, ExCoveralls uses the `cacertfile` from [`castore`](https://hexdocs.pm/castore/api-reference.html) when the dependency is installed. If it's not available and you're running Erlang `25` or later, the system will attempt to use the OS certificates via [`:public_key.cacerts_load/0`](https://www.erlang.org/doc/man/public_key.html#cacerts_load-0).
 
 ### Notes
 - If mock library is used, it will show some warnings during execution.
@@ -441,3 +581,7 @@ end
 ### Todo
 - It might not work well on projects which handle multiple project (Mix.Project) files.
     - Needs improvement on file-path handling.
+
+# License
+
+This source code is licensed under the MIT license. Copyright (c) 2013-present, parroty.

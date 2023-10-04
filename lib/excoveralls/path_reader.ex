@@ -8,7 +8,10 @@ defmodule ExCoveralls.PathReader do
   Returns the Mix.Project base path.
   """
   def base_path do
-    Mix.Project.project_file |> Path.dirname
+    case Application.fetch_env(:excoveralls, :base_path) do
+      {:ok, base_path} -> base_path
+      :error -> File.cwd!()
+    end
   end
 
   @doc """

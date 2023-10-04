@@ -23,6 +23,7 @@ defmodule ExCoveralls.JsonTest do
     "----------------\n"
 
   setup do
+    ExCoveralls.ConfServer.clear()
     path = Path.expand(@file_name, @test_output_dir)
 
     # Assert does not exist prior to write
@@ -33,6 +34,8 @@ defmodule ExCoveralls.JsonTest do
         File.rm!(path)
         File.rmdir!(@test_output_dir)
       end
+
+      ExCoveralls.ConfServer.clear()
     end
 
     {:ok, report: path}
@@ -50,7 +53,16 @@ defmodule ExCoveralls.JsonTest do
       Json.execute(@source_info)
     end) =~ @stats_result
 
-    assert(File.read!(report) =~ ~s({"source_files":[{"coverage":[0,1,null,null],"name":"test/fixtures/test.ex","source":"defmodule Test do\\n  def test do\\n  end\\nend\\n"}]}))
+    assert(
+      %{
+        "source_files" => [
+          %{
+            "coverage" => [0, 1, nil, nil],
+            "name" => "test/fixtures/test.ex",
+            "source" => "defmodule Test do\n  def test do\n  end\nend\n"
+          }
+        ]
+      } = Jason.decode!(File.read!(report)))
     %{size: size} = File.stat! report
     assert(size == @file_size)
   end
@@ -60,7 +72,16 @@ defmodule ExCoveralls.JsonTest do
       Json.execute(@source_info, [output_dir: @test_output_dir])
     end) =~ @stats_result
 
-    assert(File.read!(report) =~ ~s({"source_files":[{"coverage":[0,1,null,null],"name":"test/fixtures/test.ex","source":"defmodule Test do\\n  def test do\\n  end\\nend\\n"}]}))
+    assert(
+      %{
+        "source_files" => [
+          %{
+            "coverage" => [0, 1, nil, nil],
+            "name" => "test/fixtures/test.ex",
+            "source" => "defmodule Test do\n  def test do\n  end\nend\n"
+          }
+        ]
+      } = Jason.decode!(File.read!(report)))
     %{size: size} = File.stat! report
     assert(size == @file_size)
   end

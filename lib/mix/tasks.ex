@@ -33,7 +33,7 @@ defmodule Mix.Tasks.Coveralls do
         message: "Please specify 'test_coverage: [tool: ExCoveralls]' in the 'project' section of mix.exs"
     end
 
-    switches = [filter: :string, umbrella: :boolean, verbose: :boolean, pro: :boolean, parallel: :boolean, sort: :string, output_dir: :string]
+    switches = [filter: :string, umbrella: :boolean, verbose: :boolean, pro: :boolean, parallel: :boolean, sort: :string, output_dir: :string, subdir: :string, rootdir: :string, flagname: :string, import_cover: :string]
     aliases = [f: :filter, u: :umbrella, v: :verbose, o: :output_dir]
     {args, common_options} = parse_common_options(args, switches: switches, aliases: aliases)
     all_options = options ++ common_options
@@ -54,13 +54,18 @@ defmodule Mix.Tasks.Coveralls do
     Runner.run(test_task, ["--cover"] ++ args)
 
     if all_options[:umbrella] do
-      analyze_sub_apps(all_options)
+      type = options[:type] || "local"
+
+      ExCoveralls.StatServer.get
+      |> MapSet.to_list
+      |> ExCoveralls.analyze(type, options)
     end
   end
 
   def parse_common_options(args, common_options) do
     common_switches = Keyword.get(common_options, :switches, [])
     common_aliases = Keyword.get(common_options, :aliases, [])
+
     {common_options, _remaining, _invalid} = OptionParser.parse(args, common_options)
 
     # the switches that excoveralls supports
@@ -80,13 +85,13 @@ defmodule Mix.Tasks.Coveralls do
       end
     end)
 
+    sub_dir_set? = not (common_options[:subdir] in [nil, ""])
+    root_dir_set? = not (common_options[:rootdir] in [nil, ""])
+    if sub_dir_set? and root_dir_set? do
+      raise ExCoveralls.InvalidOptionError,
+                message: "subdir and rootdir options are exclusive. please specify only one of them."
+    end
     {remaining, common_options}
-  end
-
-  defp analyze_sub_apps(options) do
-    type = options[:type] || "local"
-    stats = ExCoveralls.StatServer.get |> MapSet.to_list
-    ExCoveralls.analyze(stats, type, options)
   end
 
   defmodule Detail do
@@ -133,6 +138,21 @@ defmodule Mix.Tasks.Coveralls do
       Mix.Tasks.Coveralls.do_run(args, [ type: "xml" ])
     end
   end
+  
+  defmodule Cobertura do
+    @moduledoc """
+    Provides an entry point for outputting coveralls information
+    as a Cobertura XML file.
+    """
+    use Mix.Task
+
+    @shortdoc "Output the test coverage as a Cobertura XML file"
+    @preferred_cli_env :test
+
+    def run(args) do
+      Mix.Tasks.Coveralls.do_run(args, [ type: "cobertura" ])
+    end
+  end
 
   defmodule Json do
     @moduledoc """
@@ -146,6 +166,21 @@ defmodule Mix.Tasks.Coveralls do
 
     def run(args) do
       Mix.Tasks.Coveralls.do_run(args, [ type: "json" ])
+    end
+  end
+
+  defmodule Lcov do
+    @moduledoc """
+    Provides an entry point for outputting coveralls information
+    as a Lcov file.
+    """
+    use Mix.Task
+
+    @shortdoc "Output the test coverage as a Lcov file"
+    @preferred_cli_env :test
+
+    def run(args) do
+      Mix.Tasks.Coveralls.do_run(args, [ type: "lcov" ])
     end
   end
 
@@ -172,6 +207,19 @@ defmodule Mix.Tasks.Coveralls do
 
     def run(args) do
       Mix.Tasks.Coveralls.do_run(args, [type: "github"])
+    end
+  end
+
+  defmodule Gitlab do
+    @moduledoc """
+    Provides an entry point for gitlab's script.
+    """
+    use Mix.Task
+
+    @preferred_cli_env :test
+
+    def run(args) do
+      Mix.Tasks.Coveralls.do_run(args, type: "gitlab")
     end
   end
 
@@ -227,11 +275,21 @@ defmodule Mix.Tasks.Coveralls do
     @preferred_cli_env :test
 
     def run(args) do
-      switches = [filter: :string, umbrella: :boolean, verbose: :boolean, pro: :boolean, parallel: :boolean]
+      switches = [
+        filter: :string,
+        umbrella: :boolean,
+        verbose: :boolean,
+        pro: :boolean,
+        parallel: :boolean,
+        rootdir: :string,
+        subdir: :string,
+        build: :string,
+        import_cover: :string
+      ]
       aliases = [f: :filter, u: :umbrella, v: :verbose]
       {remaining, options} = Mix.Tasks.Coveralls.parse_common_options(
         args,
-        switches: switches ++ [sha: :string, token: :string, committer: :string, branch: :string, message: :string, name: :string],
+        switches: switches ++ [sha: :string, token: :string, committer: :string, branch: :string, message: :string, name: :string, flagname: :string],
         aliases: aliases ++ [n: :name, b: :branch, c: :committer, m: :message, s: :sha, t: :token]
       )
 
@@ -240,12 +298,18 @@ defmodule Mix.Tasks.Coveralls do
           endpoint:     Application.get_env(:excoveralls, :endpoint),
           token:        extract_token(options),
           service_name: extract_service_name(options),
+          service_number: options[:build] || "",
           branch:       options[:branch] || "",
           committer:    options[:committer] || "",
           sha:          options[:sha] || "",
           message:      options[:message] || "[no commit message]",
           umbrella:     options[:umbrella],
-          verbose:      options[:verbose]
+          verbose:      options[:verbose],
+          parallel:     options[:parallel],
+          flag_name:    options[:flagname] || "",
+          rootdir:      options[:rootdir] || "",
+          subdir:       options[:subdir] || "",
+          import_cover: options[:string]
         ])
     end
 
@@ -259,6 +323,41 @@ defmodule Mix.Tasks.Coveralls do
                       message: "Token is NOT specified in the argument nor environment variable."
         token -> token
       end
+    end
+  end
+  
+  defmodule Multiple do
+    @moduledoc """
+    Provides an entry point for executing multiple coveralls
+    task at once without re-running tests
+    """
+
+    use Mix.Task
+
+    @preferred_cli_env :test
+
+    def run(args) do
+      {parsed, _, _} = OptionParser.parse(args, strict: [type: :keep])
+
+      args = remove_type_args(args)
+      
+      case Keyword.get_values(parsed, :type) do
+        [] -> raise ExCoveralls.InvalidOptionError, message: "type argument is required"
+        types -> Mix.Tasks.Coveralls.do_run(args, type: types)
+      end
+    end
+    
+    defp remove_type_args(args) do
+      {res, _} =
+        Enum.reduce(args, {[], nil}, fn entry, {buffer, acc} ->
+          case {entry, acc} do
+            {_, "--type" }-> {buffer, nil}
+            {"--type", _} -> {buffer, "--type"}
+            {el, _} -> {[el | buffer], nil}
+          end
+        end)
+        
+        Enum.reverse(res)
     end
   end
 end

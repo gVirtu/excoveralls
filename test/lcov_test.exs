@@ -1,15 +1,16 @@
-defmodule ExCoveralls.XmlTest do
+defmodule ExCoveralls.LcovTest do
   use ExUnit.Case
   import Mock
   import ExUnit.CaptureIO
-  alias ExCoveralls.Xml
+  alias ExCoveralls.Lcov
 
-  @file_name "excoveralls.xml"
+  @file_name "lcov.info"
   @test_output_dir "cover_test/"
 
   @content     "defmodule Test do\n  def test do\n  end\nend\n"
   @counts      [0, 1, nil, nil]
-  @source_info [%{name: "test/fixtures/test.ex",
+  @test_file_name "test/fixtures/test.ex"
+  @source_info [%{name: @test_file_name,
                   source: @content,
                   coverage: @counts
                }]
@@ -40,29 +41,30 @@ defmodule ExCoveralls.XmlTest do
     {:ok, report: path}
   end
 
-  test_with_mock "generate xml file", %{report: report}, ExCoveralls.Settings, [],
+  test_with_mock "generate lcov file", %{report: report}, ExCoveralls.Settings, [],
       [
         get_coverage_options: fn -> %{"output_dir" => @test_output_dir} end,
         get_file_col_width: fn -> 40 end,
         get_print_summary: fn -> true end,
-        get_print_files: fn -> true end,
-        get_xml_base_dir: fn -> "base_dir" end
+        get_print_files: fn -> true end
       ] do
 
     assert capture_io(fn ->
-      Xml.execute(@source_info)
+      Lcov.execute(@source_info)
     end) =~ @stats_result
 
-    assert File.read!(report) =~ ~s(<coverage version="1"><file path="base_dir/test/fixtures/test.ex"><lineToCover lineNumber="1" covered="false"/><lineToCover lineNumber="2" covered="true"/></file></coverage>)
-    assert %{size: 173} = File.stat! report
+    source_file = Path.expand(@test_file_name, ".")
+
+    assert(File.read!(report) =~ ~s(TN:\nSF:#{source_file}\nDA:1,0\nDA:2,1\nLF:2\nLH:1\nend_of_record\n))
   end
 
   test "generate json file with output_dir parameter", %{report: report} do
     assert capture_io(fn ->
-      Xml.execute(@source_info, [output_dir: @test_output_dir])
+      Lcov.execute(@source_info, [output_dir: @test_output_dir])
     end) =~ @stats_result
 
-    assert File.read!(report) =~ ~s(<coverage version="1"><file path="/test/fixtures/test.ex"><lineToCover lineNumber="1" covered="false"/><lineToCover lineNumber="2" covered="true"/></file></coverage>)
-    assert %{size: 165} = File.stat! report
+    source_file = Path.expand(@test_file_name, ".")
+
+    assert(File.read!(report) =~ ~s(TN:\nSF:#{source_file}\nDA:1,0\nDA:2,1\nLF:2\nLH:1\nend_of_record\n))
   end
 end

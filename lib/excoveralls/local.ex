@@ -2,6 +2,8 @@ defmodule ExCoveralls.Local do
   @moduledoc """
   Locally displays the result to screen.
   """
+  
+  
 
   defmodule Count do
     @moduledoc """
@@ -44,8 +46,9 @@ defmodule ExCoveralls.Local do
   """
   def print_summary(stats, options \\ []) do
     enabled = ExCoveralls.Settings.get_print_summary
-    if enabled do
-      coverage(stats, options) |> IO.puts
+    if enabled and not ExCoveralls.ConfServer.summary_printed?() do
+      coverage(stats, options) |> IO.puts()
+      ExCoveralls.ConfServer.summary_printed()
     end
   end
 
@@ -229,7 +232,7 @@ defmodule ExCoveralls.Local do
   end
 
   @doc """
-  Calucate count information from thhe coverage stats.
+  Calculate count information from the coverage stats.
   """
   def calculate_count(coverage) do
     do_calculate_count(coverage, 0, 0, 0)
