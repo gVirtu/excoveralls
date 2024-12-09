@@ -242,7 +242,7 @@ defmodule ExCoveralls.Stats do
 
   defp check_coverage_threshold(stats, minimum_coverage) do
     result = source(stats)
-    if result.coverage < minimum_coverage do
+    if trunc(result.coverage) < minimum_coverage do
       message = "FAILED: Expected minimum coverage of #{minimum_coverage}%, got #{result.coverage}%."
       IO.puts IO.ANSI.format([:red, :bright, message])
       exit({:shutdown, 1})
