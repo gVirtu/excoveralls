@@ -46,7 +46,8 @@ def project do
       coveralls: :test,
       "coveralls.detail": :test,
       "coveralls.post": :test,
-      "coveralls.html": :test
+      "coveralls.html": :test,
+      "coveralls.cobertura": :test
     ]
     # if you want to use espec,
     # test_coverage: [tool: ExCoveralls, test_task: "espec"]
@@ -55,7 +56,7 @@ end
 
 defp deps do
   [
-    {:excoveralls, "~> 0.10", only: :test},
+    {:excoveralls, "~> 0.18", only: :test},
   ]
 end
 ```
@@ -441,6 +442,9 @@ to `false`:
   - When set to a number greater than 0, this setting causes the `mix coveralls` and `mix coveralls.html` tasks to exit with a status code of 1 if test coverage falls below the specified threshold (defaults to 0). This is useful to interrupt CI pipelines with strict code coverage rules. Should be expressed as a number between 0 and 100 signifying the minimum percentage of lines covered.
 - `html_filter_full_covered`
   - A boolean, when `true` files with 100% coverage are not shown in the HTML report. Default to `false`.
+- `floor_coverage`
+  - A boolean, when `false` coverage values are ceiled instead of floored, this means that a project with some lines
+    that are not covered can still have a total 100% coverage. Default to `true`.
 
 Example configuration file:
 

@@ -8,20 +8,31 @@ defmodule ExCoveralls.LocalTest do
   @counts      [0, 1, nil, nil]
   @source_info [%{name: "test/fixtures/test.ex",
                  source: @content,
-                 coverage: @counts
+                 coverage: @counts,
+                 warnings: []
                }]
 
   @invalid_counts [0, 1, nil, "invalid"]
   @invalid_source_info [%{name: "test/fixtures/test.ex",
                  source: @content,
-                 coverage: @invalid_counts
+                 coverage: @invalid_counts,
+                 warnings: []
                }]
 
   @empty_counts [nil, nil, nil, nil]
   @empty_source_info [%{name: "test/fixtures/test.ex",
                  source: @content,
-                 coverage: @empty_counts
+                 coverage: @empty_counts,
+                 warnings: []
                }]
+
+  @warning_source_info [%{
+                 name: "test/fixtures/test.ex",
+                 source: @content,
+                 coverage: @counts,
+                 warnings: [{2, "this is a test"}, {4, "another test"}]
+               }]
+
 
   @stats_result "" <>
       "----------------\n" <>
@@ -46,7 +57,13 @@ defmodule ExCoveralls.LocalTest do
       "\e[31mdefmodule Test do\e[m\n\e[32m  def test do\e[m\n" <>
       "  end\n" <>
       "end"
-      
+
+  @warning_result "" <>
+      "\n\e[33mwarning:\e[m this is a test\n" <>
+      "  test/fixtures/test.ex:3\n" <>
+      "\e[33mwarning:\e[m another test\n" <>
+      "  test/fixtures/test.ex:5\n"
+
   setup do
     ExCoveralls.ConfServer.clear()
     on_exit(fn -> ExCoveralls.ConfServer.clear() end)
@@ -95,12 +112,18 @@ defmodule ExCoveralls.LocalTest do
     end
   end
 
+  test "display warnings" do
+    assert capture_io(fn ->
+      Local.execute(@warning_source_info)
+    end) =~ @warning_result
+  end
+
   test "Empty (no relevant lines) file is calculated as 0.0%" do
-    assert String.contains?(Local.coverage(@empty_source_info), "[TOTAL] 100.0%")
+    assert String.contains?(Local.coverage(@empty_source_info), "[TOTAL]   0.0%")
   end
 
   test_with_mock "Empty (no relevant lines) file with treat_no_relevant_lines_as_covered=true option is calculated as 100.0%",
-    ExCoveralls.Settings, [
+    ExCoveralls.Settings, [:passthrough], [
       get_coverage_options: fn -> %{"treat_no_relevant_lines_as_covered" => true} end,
       get_file_col_width: fn -> 40 end,
       get_print_files: fn -> true end
@@ -109,7 +132,7 @@ defmodule ExCoveralls.LocalTest do
   end
 
   test_with_mock "Empty (no relevant lines) file with treat_no_relevant_lines_as_covered=false option is calculated as 0.0%",
-      ExCoveralls.Settings, [
+      ExCoveralls.Settings, [:passthrough], [
         get_coverage_options: fn -> %{"treat_no_relevant_lines_as_covered" => false} end,
         get_file_col_width: fn -> 40 end,
         get_print_files: fn -> true end
@@ -118,7 +141,6 @@ defmodule ExCoveralls.LocalTest do
   end
 
   test_with_mock "Exit status code is 1 when actual coverage does not reach the minimum",
-
       ExCoveralls.Settings, [
         get_coverage_options: fn -> %{"minimum_coverage" => 100} end,
         get_file_col_width: fn -> 40 end,
@@ -128,7 +150,7 @@ defmodule ExCoveralls.LocalTest do
     output = capture_io(fn ->
       assert catch_exit(Local.execute(@source_info)) == {:shutdown, 1}
     end)
-    assert String.contains?(output, "FAILED: Expected minimum coverage of 100%, got 50%.")
+    assert String.contains?(output, "FAILED: Expected minimum coverage of 100%, got 50.0%.")
   end
 
   test_with_mock "Exit status code is 0 when actual coverage reaches the minimum",

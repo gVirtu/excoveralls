@@ -1,3 +1,35 @@
+0.18.4
+------
+#### Changes
+- Elixir 1.18 compatibility (#333)
+
+0.18.3
+------
+#### Changes
+- Avoid warning messages for Cobertura
+  - Update Range to use function syntax (#332)
+
+0.18.2
+------
+#### Enhancements
+- Print warnings about incorrectly used ignore-markers (#325), such as start-marker
+without a corresponding stop-marker, or two start-markers without a stop-marker in-between etc.
+
+#### Changes
+- Fix Elixir 1.17 single-quoted string warning (#327)
+
+0.18.1
+------
+#### Changes
+- Use explicit steps to remove 1.16 deprecation warning in Cobertura (#322).
+
+0.18.0
+------
+#### Changes
+- Always floor coverage instead of rounding (#310).
+  - **Note:** If you want to keep the previous rounding behavior, please check the `floor_coverage` option.
+    - https://github.com/parroty/excoveralls#coverage-options
+
 0.17.1
 ------
 #### Enhancements
